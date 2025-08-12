@@ -193,8 +193,12 @@ class ChatSessionManager:
         self.reference_list = []
 
         self.confirm_ask_event = Event()
+        self.cancel_event = Event()
         self.queue = Queue()
     
+    def cancel_chat(self):
+        self.cancel_event.set()
+
     def _update_patch_coder(self):
         self.coder.on_data_update(lambda data: self.queue.put(data))
 
@@ -250,8 +254,10 @@ class ChatSessionManager:
         if need_update_coder:
             self.update_coder()
         
+        self.cancel_event.clear()
         # Start coder thread
-        thread = Thread(target=self._coder_thread, args=(data.message,))
+        thread = Thread(target=self._coder_thread, args=(data.message, self.cancel_event))
+        thread.daemon = True
         thread.start()
 
         # Yield data from queue
@@ -261,12 +267,17 @@ class ChatSessionManager:
             if chunk.event == 'end':
                 break
 
-    def _coder_thread(self, message: str):
+    def _coder_thread(self, message: str, cancel_event: Event):
         try:
             self.coder.init_before_message()
             while message:
+                if cancel_event.is_set():
+                    return
+
                 self.coder.reflected_message = None
                 for msg in self.coder.run_stream(message):
+                    if cancel_event.is_set():
+                        return
                     data = {
                         "chunk": msg,
                     }
@@ -352,13 +363,16 @@ def sse():
     chat_session_data = ChatSessionData(**data)
 
     def generate():
-        for msg in manager.chat(chat_session_data):
-            if msg.data:
-                yield f"event: {msg.event}\n"
-                yield f"data: {json.dumps(msg.data)}\n\n"
-            else:
-                yield f"event: {msg.event}\n"
-                yield f"data:\n\n"
+        try:
+            for msg in manager.chat(chat_session_data):
+                if msg.data:
+                    yield f"event: {msg.event}\n"
+                    yield f"data: {json.dumps(msg.data)}\n\n"
+                else:
+                    yield f"event: {msg.event}\n"
+                    yield f"data:\n\n"
+        finally:
+            manager.cancel_chat()
 
     response = Response(generate(), mimetype='text/event-stream')
     return response
