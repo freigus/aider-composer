@@ -15,6 +15,7 @@ import {
 } from '../types';
 import { nanoid } from 'nanoid';
 import {
+  apiCancelChat,
   apiChat,
   apiClearChat,
   apiSaveSession,
@@ -603,9 +604,9 @@ export const useChatStore = create(
         //   eventSource.close();
         // };
       },
-      cancelChat() {
-        get().currentChatRequest?.close();
-        set({ currentChatRequest: undefined });
+      async cancelChat() {
+        await apiCancelChat();
+        set({ current: undefined, currentChatRequest: undefined });
       },
     }),
   ),

@@ -510,9 +510,13 @@ const ChatActionButton = styled.button({
   fontSize: 'inherit',
 });
 
-function ChatActionBar(props: { onChatClick: () => void }) {
+function ChatActionBar(props: {
+  onChatClick: () => void;
+  onCancelClick: () => void;
+}) {
   const [open, setOpen] = useState(false);
 
+  const currentMessage = useChatStore((state) => state.current);
   const chatType = useChatSettingStore((state) => state.chatType);
   const setChatType = useChatSettingStore((state) => state.setChatType);
   const diffFormat = useChatSettingStore((state) => state.diffFormat);
@@ -572,13 +576,20 @@ function ChatActionBar(props: { onChatClick: () => void }) {
         </Popover.Content>
       </Popover.Root>
       <div style={{ flexGrow: 1 }} />
-      <ChatActionButton onClick={props.onChatClick}>⏎ chat</ChatActionButton>
+      {currentMessage ? (
+        <ChatActionButton onClick={props.onCancelClick}>
+          Cancel
+        </ChatActionButton>
+      ) : (
+        <ChatActionButton onClick={props.onChatClick}>⏎ chat</ChatActionButton>
+      )}
     </div>
   );
 }
 
 export default function ChatTextArea() {
   const editorRef = useRef<{ sendChat: () => void }>(null);
+  const cancelChat = useChatStore((state) => state.cancelChat);
 
   const onChatClick = () => {
     editorRef.current?.sendChat();
@@ -613,7 +624,7 @@ export default function ChatTextArea() {
       >
         <ChatEditor ref={editorRef} />
       </div>
-      <ChatActionBar onChatClick={onChatClick} />
+      <ChatActionBar onChatClick={onChatClick} onCancelClick={cancelChat} />
     </div>
   );
 }

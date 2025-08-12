@@ -23,6 +23,10 @@ export function apiChat(payload: unknown) {
   });
 }
 
+export function apiCancelChat() {
+  return callCommand('api-cancel-chat', null);
+}
+
 export function apiClearChat() {
   return callCommand('api-clear-chat', null);
 }

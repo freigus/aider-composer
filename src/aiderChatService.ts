@@ -11,6 +11,8 @@ export default class AiderChatService {
   private aiderChatProcess: ChildProcess | undefined;
   private isDev = false;
 
+  private chatRequestAbortController: AbortController | undefined;
+
   port: number = 0;
 
   onStarted: () => void = () => {};
@@ -242,33 +244,35 @@ export default class AiderChatService {
     payload: unknown,
     chunkCallback: (data: { name?: string; data: unknown }) => void,
   ) {
-    const res = await fetch(`${this.serviceUrl}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const stream = res.body
-      ?.pipeThrough(new TextDecoderStream())
-      .pipeThrough(new EventSourceParserStream());
-
-    if (!stream) {
-      return;
-    }
-
-    // eventsource-client has reconnect logic and it can't be cancelled
-    // const stream = createEventSource({
-    //   url: `${this.serviceUrl}/api/chat`,
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(payload),
-    // });
-
+    this.chatRequestAbortController = new AbortController();
     try {
+      const res = await fetch(`${this.serviceUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: this.chatRequestAbortController.signal,
+      });
+
+      const stream = res.body
+        ?.pipeThrough(new TextDecoderStream())
+        .pipeThrough(new EventSourceParserStream());
+
+      if (!stream) {
+        return;
+      }
+
+      // eventsource-client has reconnect logic and it can't be cancelled
+      // const stream = createEventSource({
+      //   url: `${this.serviceUrl}/api/chat`,
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify(payload),
+      // });
+
       for await (const event of stream) {
         if (this.isDev) {
           console.log('chunk', event);
@@ -292,8 +296,14 @@ export default class AiderChatService {
           error: `${e}`,
         },
       });
+    } finally {
+      this.chatRequestAbortController = undefined;
     }
     // stream.close();
+  }
+
+  async apiCancelChat() {
+    this.chatRequestAbortController?.abort();
   }
 
   async apiClearChat() {

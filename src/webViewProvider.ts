@@ -267,6 +267,9 @@ class VscodeReactView implements WebviewViewProvider {
           case 'api-chat':
             promise = this.chatService.apiChat(data, chunkCallback);
             break;
+          case 'api-cancel-chat':
+            promise = this.chatService.apiCancelChat();
+            break;
           case 'api-clear-chat':
             promise = this.chatService.apiClearChat();
             break;
